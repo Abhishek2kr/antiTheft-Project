@@ -1,1 +1,25 @@
 http://aprs.gids.nl/nmea/
+
+NMEA meaning:
+
+$GPGGA      Global Positioning system fix data
+
+HHMMSS.SSS  Time in hour minute seconds and milliseconds format.
+
+Latitude    Latitude (Coordinate)  N   Direction N=North, S=South
+
+Longitude   Longitude(Coordinate)  E   Direction E= East, W=West
+
+FQ          Fix Quality Data
+
+NOS         No. of Satellites being Used
+
+HDP         Horizontal Dilution of Precision
+
+Altitude    Altitude (meters above from sea level)
+
+M           Meter
+
+Height      Height
+
+Checksum    Checksum Data
