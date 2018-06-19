@@ -1,0 +1,338 @@
+#include <SoftwareSerial.h>
+#include <TinyGPS++.h>
+
+#define PINNUMBER ""
+#define DEBUG true
+//String phone_no = "+YYXXXXXXXXX"; // +country_codePhonenumber like:+919999999999
+String owner_num = "+919430214629";
+String owner_sms = "";
+int test_count = 1;
+String parked_latitude = "80.000004";
+String parked_longitude = "80.000004";
+String new_latitude = "80.000004";
+String new_longitude = "80.000004";
+String vehicle_status = "";
+String response_sms = "";
+String textMessage = "";
+int n = 1 ;
+boolean vehicle_mov_status = false;
+// initialize the library instance
+TinyGPSPlus gps;
+static const int RXPin = 2, TXPin = 3;
+static const uint32_t GPSBaud = 9600;
+
+// The serial connection to the GPS device
+SoftwareSerial mySerial(RXPin, TXPin);
+
+// Function to check the gsm status 
+
+void send_location_by_sms(){
+  Serial.println("send_location_by_sms() started");
+  String txtMsg = response_sms; //msg return by gps
+  Serial.println("SENDING");
+  Serial.println();
+  Serial.println("Message:");
+  Serial.println(txtMsg);
+  delay(2000);
+  // Send SMS command
+  //sendData("AT+CMGS=\"+919962534005\"\r",1000,DEBUG);
+  //Serial.print(phone_no);
+  sendData("AT+CMGS="+owner_num,1000,DEBUG);
+  delay(1000);
+  // Sending the text message
+  mySerial.println(txtMsg);
+  delay(100);
+  // clicking on enter key 
+  mySerial.println((char)26);
+  delay(1000);
+  Serial.print("Message Send!");
+  Serial.println("send_location_by_sms() ended"); 
+}
+
+ 
+void gpsInit(){
+Serial.println("After 3s, test begin!!");
+  Serial.println("In GPS init");
+  delay(3000);
+  sendData("AT+GPS=? ", 1000, DEBUG);
+  sendData("AT+AGPS=? ",1000,DEBUG); 
+  sendData("AT+GPSRD=?",1000,DEBUG);
+  delay(1000);
+  sendData("AT+GPSRD=0",1000,DEBUG);
+  sendData("AT+GPS=1 ", 1000, DEBUG);
+  sendData("AT+GPSRD=1",1000,DEBUG); 
+   for(int i=0;i<50;i++){
+    Serial.println("Testing GPS Output");
+    sendData("AT+GPSRD=0",1000,DEBUG);
+    sendData("AT+GPSRD=1",1000,DEBUG);
+    
+                                                          /*$GPGGA,104534.000,7791.0381,N,06727.4434,E,1,08,0.9,510.4,M,43.9,M,,*47
+                                                          $GPGGA,HHMMSS.SSS,latitude,N,longitude,E,FQ,NOS,HDP,altitude,M,height,M,,checksum data*/
+    delay(2000);
+    Serial.println("mySerial.available() > 0 is " + mySerial.available() > 0);
+    delay(1000);
+    if (mySerial.available() > 0) {
+        Serial.println("GPS Working...") ;
+        Serial.println("Checking GPS Location!");
+        display_location();
+        parked_latitude = new_latitude;
+        parked_longitude = new_longitude; 
+        break; 
+    }
+    Serial.println("looking for Correct location Wait!! please");
+   }  
+      
+    delay(2000);
+}
+ 
+void gsmInit(){
+  Serial.println("In GSM init");
+   //SMS text mode closed
+   sendData("AT+CMGF=0",1000,DEBUG);
+   delay(1000);
+   //SMS text mode checking
+   sendData("AT+CMGR=?",1000,DEBUG);
+   delay(1000);
+   //SMS text mode opening
+   sendData("AT+CMGF=1",1000,DEBUG);
+}//End of get_owner_sms method  
+
+/*void get_owner_sms(){
+ 
+  // If there are any SMSs available()
+  if(mySerial.available()>0){
+    owner_sms = mySerial.readString();
+    vehicle_status = owner_sms;
+    Serial.print(vehicle_status);
+    delay(1000);
+    display_location();
+    delay(1000); // When Owner will send any msg vehicle location will updated
+    parked_latitude = new_latitude;
+    parked_longitude = new_longitude;  
+    delay(1000);
+  } 
+}*/
+
+  
+void set_vehicle_moving_status(){
+ Serial.println("set_vehicle_moving_status started");
+ int count = 0;
+ display_location();
+ for(int i = 1; i <= 5; i++){
+  if((new_latitude.toInt() != parked_latitude.toInt()) || (new_longitude.toInt() != parked_longitude.toInt())){
+      Serial.println("Confirming vehicle status");
+      count++; 
+   }
+   Serial.println("In for loop");
+ }
+ if(count >= 3){  // Here cheking the longitude and latitude atleast 3 times to confirm the moving status
+   vehicle_mov_status = true;
+   Serial.println(vehicle_mov_status);
+   Serial.println("set_vehicle_moving_status ended vehicle_mov_status = "+vehicle_mov_status);   
+  }
+ else{
+      vehicle_mov_status = false;
+      Serial.println(vehicle_mov_status);
+        Serial.println("set_vehicle_moving_status ended vehicle_mov_status = "+vehicle_mov_status); 
+    }
+
+ if(vehicle_mov_status){
+          if(vehicle_status.equalsIgnoreCase("parked")){
+               response_sms = "Warning Vehicle Location Changing! Take Action";
+               //send_location_by_sms();
+               delay(2000);
+               display_location();
+               delay(2000);
+               send_location_by_sms();
+               //code for buzzer on
+          }
+    }
+   if(!vehicle_mov_status){
+        Serial.println("Vehicle is not moving no problem");  
+    }   
+
+}
+
+void setup()
+{
+  Serial.begin(GPSBaud);
+  mySerial.begin(GPSBaud);
+  Serial.println(F("Anti-Theft Device Project by Abhishek Kumar"));
+  delay(1000); 
+  baudrate();
+  gsmInit();
+  Serial.println("gsminit done!");
+  gpsInit();
+  vehicle_status = "parked";
+  
+}
+
+void loop()
+{ 
+        if(n == 1){
+        
+        Serial.println("In loop start");
+        
+        Serial.println("vehicle_status = "+ vehicle_status );
+        set_vehicle_moving_status(); // It will check the vehicle moving status and warn if vehicle will be lost.
+        Serial.println("vehicle_mov_status = "+ vehicle_mov_status );
+        delay(1000);
+        n = 0;
+        }
+       // gsmInit();
+   else {   
+    delay(3000); // Waiting for reading the message
+   
+    if(mySerial.available()>0){
+         Serial.print("just below if(mySerial.available()>0)");
+         textMessage = mySerial.readString();
+         Serial.print("Message = "+textMessage);    
+         delay(1000);
+          if(textMessage.indexOf("track")>=0){
+                // Track and send the current location
+                Serial.println("tracking the vehicle!!");  
+                textMessage = ""; 
+                delay(1000);
+                display_location();
+                delay(1000);
+                send_location_by_sms();
+         }
+  
+         else if(textMessage.indexOf("moving")>=0){
+                // Turn off relay and save current state
+                Serial.println("Owner is driving");
+                textMessage = "";
+                vehicle_status = "moving";  
+         }
+  
+         else if(textMessage.indexOf("parked")>=0){
+                Serial.println("Vehicle Parked");
+                vehicle_status = "parked";
+                delay(2000);
+                display_location();
+                delay(1000);
+                parked_latitude = new_latitude;
+                parked_longitude = new_longitude;
+                delay(1000);
+                send_location_by_sms();
+                textMessage = "";
+         }
+    }
+     n = 1;
+  }
+          Serial.println("loop ended");
+  
+}//End of loop method
+
+
+void display_location(){
+  Serial.println("display_location started");
+   sendData("AT+GPS=1 ", 1000, DEBUG);
+   sendData("AT+GPSRD=1",1000,DEBUG);
+   while(mySerial.available() > 0){
+       if (gps.encode(mySerial.read())){
+           //Serial.print(F("Location: ")); 
+           if (gps.location.isValid()){
+                //Serial.print(gps.location.lat());
+                //Serial.print(F(","));
+                // Serial.print(gps.location.lng(), 6);
+                new_latitude = (gps.location.lat());
+                new_longitude =(gps.location.lng());
+                response_sms = "Latitude: " + new_latitude;
+                //Serial.println(response_sms);
+                response_sms = response_sms + " Longitude: " + new_longitude; 
+                //Serial.println(response_sms);
+            
+           }
+           else{
+                //Serial.print(F("INVALID"));
+                response_sms = "Default Location";
+                Serial.print(response_sms);
+           }
+
+           // Serial.print(F("  Date/Time: "));
+       
+           if (gps.date.isValid()){
+               //Serial.print(gps.date.month());
+               //Serial.print(F("/"));
+               //Serial.print(gps.date.day());
+               //Serial.print(F("/"));
+               //Serial.print(gps.date.year());
+               response_sms = response_sms +" Date: " +gps.date.month() +"/"+ gps.date.day()+"/"+gps.date.year();
+               // Serial.println(response_sms);
+           }
+           else{
+               response_sms = response_sms +" Date: Invalid";
+               //Serial.print(response_sms);
+           }
+
+           //Serial.print(F(" "));
+           if (gps.time.isValid()){
+                /* if (gps.time.hour() < 10) Serial.print(F("0"));
+                Serial.print(gps.time.hour());
+                Serial.print(F(":"));
+                if (gps.time.minute() < 10) Serial.print(F("0"));
+                Serial.print(gps.time.minute());
+                Serial.print(F(":"));
+                if (gps.time.second() < 10) Serial.print(F("0"));
+                Serial.print(gps.time.second());
+                Serial.print(F("."));
+                if (gps.time.centisecond() < 10) Serial.print(F("0"));
+                Serial.print(gps.time.centisecond());
+                */
+                response_sms = response_sms + " Time: "+gps.time.hour()+":"+gps.time.minute()+":"+gps.time.second();
+                //Serial.println(response_sms);
+           }
+           else{
+               response_sms = response_sms + " Time: INVALID";
+               Serial.print(response_sms);
+           }
+           Serial.println(response_sms);
+           break;
+       }
+    }
+  // In case of GPS not working
+  if(!(mySerial.available() > 0) || !(gps.encode(mySerial.read()))){
+     response_sms = "Unable to get location";  
+  }
+  Serial.println(response_sms);
+  sendData("AT+GPS=0 ", 1000, DEBUG);
+  sendData("AT+GPSRD=0",1000,DEBUG);
+  Serial.println("display_location ended");
+ }//End of display location method
+
+
+ String sendData(String command, const int timeout, boolean debug)
+{
+    String response = "";    
+    mySerial.println(command); 
+    long int time = millis();   
+    
+    while( (time+timeout) > millis())
+    {
+      while(mySerial.available())
+      {       
+        char c = mySerial.read(); 
+        response+=c;
+      }  
+    }    
+    if(debug)
+    {
+      Serial.println(response);
+    }    
+    return response;
+}
+
+void baudrate()
+{     
+      //Serial.println("In baudrate method");
+      int i=0;
+      for(i=0;i<10;i++)
+      {
+           String msg = String("");
+           msg=sendData("AT",1000,DEBUG);
+           if( msg.indexOf("ok") >= 0 ){
+              return;
+           }
+      }
+}
